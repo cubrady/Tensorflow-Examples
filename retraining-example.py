@@ -118,7 +118,7 @@ if __name__ == '__main__':
             spend = time.time() - start
             spendTime = spend / float(count)
             remain = (total - count) * spendTime
-            print "[%.2f%%] %d/%d, remain : %d sec" % (count / float(total) * 100, count, total, remain)
+            print "[%.2f%%] %d/%d, remain : %d sec, avg:%.3f" % (count / float(total) * 100, count, total, remain, spendTime)
             print "=" * 100
 
     totalSpend = time.time() - start
