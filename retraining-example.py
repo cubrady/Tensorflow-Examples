@@ -35,32 +35,38 @@ For testing through python, change and run this code.
 
 import numpy as np
 import tensorflow as tf
+import os, time
+from shutil import copyfile
 
-imagePath = '/tmp/imagenet/flower.jpg'
-modelFullPath = '/tmp/output_graph.pb'
-labelsFullPath = '/tmp/output_labels.txt'
+MODEL_NAME = 'output_graph.pb'
+LABEL_NAME = 'output_labels.txt'
+MODEL_VER = 3
+WORKSPACE = '/home/ubuntu/tf_model/v%d/' % MODEL_VER
+MODEL_PATH = os.path.join(WORKSPACE, MODEL_NAME)
+LABEL_PATH = os.path.join(WORKSPACE, LABEL_NAME)
 
+validate_folder = "/home/ubuntu/dataset"
+
+def checkFolder(folder):
+    if not os.path.exists(folder):
+        os.makedirs(folder)
 
 def create_graph():
     """Creates a graph from saved GraphDef file and returns a saver."""
     # Creates graph from saved graph_def.pb.
-    with tf.gfile.FastGFile(modelFullPath, 'rb') as f:
+    with tf.gfile.FastGFile(MODEL_PATH, 'rb') as f:
         graph_def = tf.GraphDef()
         graph_def.ParseFromString(f.read())
         _ = tf.import_graph_def(graph_def, name='')
 
-
-def run_inference_on_image():
+def analyzeIamge(image_path, label_lines):
     answer = None
 
-    if not tf.gfile.Exists(imagePath):
-        tf.logging.fatal('File does not exist %s', imagePath)
+    if not tf.gfile.Exists(image_path):
+        tf.logging.fatal('File does not exist %s', image_path)
         return answer
 
-    image_data = tf.gfile.FastGFile(imagePath, 'rb').read()
-
-    # Creates graph from saved GraphDef.
-    create_graph()
+    image_data = tf.gfile.FastGFile(image_path, 'rb').read()
 
     with tf.Session() as sess:
 
@@ -70,17 +76,51 @@ def run_inference_on_image():
         predictions = np.squeeze(predictions)
 
         top_k = predictions.argsort()[-5:][::-1]  # Getting top 5 predictions
-        f = open(labelsFullPath, 'rb')
-        lines = f.readlines()
-        labels = [str(w).replace("\n", "") for w in lines]
+        labels = [str(w).replace("\n", "") for w in label_lines]
         for node_id in top_k:
             human_string = labels[node_id]
             score = predictions[node_id]
             print('%s (score = %.5f)' % (human_string, score))
 
         answer = labels[top_k[0]]
-        return answer
-
+        score = predictions[top_k[0]]
+        return answer, score
 
 if __name__ == '__main__':
-    run_inference_on_image()
+    # Creates graph from saved GraphDef.
+    create_graph()
+
+    imageList = os.listdir(validate_folder)
+    imageList = sorted(imageList, reverse=True)
+
+    mightBeXXX = "mightBeXXX"
+    optFolderXXX = os.path.join(WORKSPACE, mightBeXXX)
+    checkFolder(optFolderXXX)
+
+    f = open(LABEL_PATH, 'rb')
+    label_lines = f.readlines()
+
+    count = 0
+    total = len(imageList)
+    start = time.time()
+    for img in imageList:
+        imagePath = os.path.join(validate_folder, img)
+        answer, score = analyzeIamge(imagePath, label_lines)
+        print "%s : %s" % (img , answer)
+
+        if "xxx" in answer:
+            copyfile(imagePath, os.path.join(optFolderXXX, "%s_%.3f.jpg" % (img.split(".")[0], score)))
+
+        count += 1
+
+        if count % 10 == 0:
+            print "=" * 100
+            spend = time.time() - start
+            spendTime = spend / float(count)
+            remain = (total - count) * spendTime
+            print "[%.2f%%] %d/%d, remain : %d sec" % (count / float(total) * 100, count, total, remain)
+            print "=" * 100
+
+    totalSpend = time.time() - start
+    print "*" * 100
+    print "Spend :%d sec, avg:%.3f sec, total process:%d" % (totalSpend, totalSpend/float(total), total)
