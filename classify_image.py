@@ -166,7 +166,7 @@ def get_inference_on_image(image):
     for node_id in top_k:
       human_string = node_lookup.id_to_string(node_id)
       score = predictions[node_id]
-      print('%s (score = %.5f)' % (human_string, score))
+      #print('%s (score = %.5f)' % (human_string, score))
       dicResult[human_string] = score
     return dicResult
 
@@ -237,7 +237,7 @@ def main(_):
 
 def classifyImages(_):
     if not FLAGS.image_folder:
-        main()
+        main(_)
         return
 
     # Creates graph from saved GraphDef.
