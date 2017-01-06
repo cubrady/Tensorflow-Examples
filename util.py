@@ -26,3 +26,7 @@ def formatSec(seconds):
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
     return "%d:%02d:%02d" % (h, m, s)
+
+def logAndWriteFile(f, msg):
+    if f : f.write(msg + "\n")
+    print msg

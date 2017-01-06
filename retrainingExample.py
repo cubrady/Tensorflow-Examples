@@ -49,13 +49,19 @@ def create_graph(graphModelPath):
         graph_def.ParseFromString(f.read())
         _ = tf.import_graph_def(graph_def, name='')
 
+def load_labels(path):
+    label_lines = []
+    for l in open(path, "r"):
+        label_lines.append(l.replace("\n", ""))
+    return label_lines
+
 def analyzeIamge(image_path, label_lines):
     answer = None
     score = 0
 
     if not tf.gfile.Exists(image_path):
         tf.logging.fatal('File does not exist %s', image_path)
-        return answer, score
+        return None
 
     image_data = tf.gfile.FastGFile(image_path, 'rb').read()
 
@@ -66,17 +72,20 @@ def analyzeIamge(image_path, label_lines):
         predictions = np.squeeze(predictions)
 
         top_k = predictions.argsort()[-5:][::-1]  # Getting top 5 predictions
-        labels = [str(w).replace("\n", "") for w in label_lines]
+        labels = label_lines#[str(w).replace("\n", "") for w in label_lines]
+        ret = []
         for node_id in top_k:
             human_string = labels[node_id]
             score = predictions[node_id]
-            print('%s (score = %.5f)' % (human_string, score))
+            #print('%s (score = %.5f)' % (human_string, score))
+            ret.append((human_string, score))
 
-        answer = labels[top_k[0]]
-        score = predictions[top_k[0]]
-        return answer, score
+        #answer = labels[top_k[0]]
+        #score = predictions[top_k[0]]
+        return ret#answer, score, labels[top_k[1]], predictions[top_k[1]]
 
 if __name__ == '__main__':
     #validateImages()
     #testImages()
+    # bazel-bin/tensorflow/examples/image_retraining/retrain --image_dir ~/flower_photos
     pass

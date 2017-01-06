@@ -1,91 +1,147 @@
-import os, time
+import os
+import sys
+import time
+import argparse
+import progressbar
+import subprocess
 from shutil import copyfile
-from retrainingExample import *
 from util import *
 
 MODEL_NAME = 'output_graph.pb'
 LABEL_NAME = 'output_labels.txt'
-MODEL_VER = 3
-WORKSPACE = '/home/brad_chang/deep_learning/trainedModel/tf/xxx_recog/v%d/' % MODEL_VER
-MODEL_PATH = os.path.join(WORKSPACE, MODEL_NAME)
-LABEL_PATH = os.path.join(WORKSPACE, LABEL_NAME)
 
-#validate_folder = "/home/brad_chang/deep_learning/dataset/xxx_detection/train/xxx"
-#validate_folder = "/home/brad_chang/deep_learning/dataset/xxx_detection/validate/"
-validate_folder = "/home/brad_chang/deep_learning/dataset/photogrid_1208"
+def __createFolders(workspace, label_lines, validate_folder):
+    fset = validate_folder.split("/")
+    optFolderBase = os.path.join(workspace, fset[-1] if fset[-1] else fset[-2])
+    checkFolder(optFolderBase)
+    for l in label_lines:
+        optFolder = os.path.join(optFolderBase, l)
+        checkFolder(optFolder)
+    return optFolderBase
 
-SAVE_TARGET_XXX = 1
-SAVE_TARGET_NORAML = 2
-CLASSIFY_RESULT_FOLDER_XXX = "mightBeXXX"
-CLASSIFY_RESULT_FOLDER_NORMAL = "mightBeOK"
+def __printResult(workspace, label_lines, dicResult, totalSpend, totalCount, printDetail = False):
+    optFile = open(os.path.join(workspace, "result.txt"), "w")
+    logAndWriteFile(optFile, "*" * 100)
 
-SAVE_TARGET = SAVE_TARGET_XXX
-CLASSIFY_RESULT_FOLDER = CLASSIFY_RESULT_FOLDER_XXX if SAVE_TARGET == SAVE_TARGET_XXX else CLASSIFY_RESULT_FOLDER_NORMAL
+    maxLabelLen = 0
+    for l in label_lines:
+        if len(l) > maxLabelLen:
+            maxLabelLen = len(l)
 
-def __checkSaveTarget(ans):
-    if SAVE_TARGET == SAVE_TARGET_XXX:
-        return "xxx" in ans
-    else:
-        return "xxx" not in ans
+    labelP = "%%%ds" % maxLabelLen
+    for label, lstImage in dicResult.iteritems():
+        logAndWriteFile(optFile, "Label " + labelP % label + " : %d ( %.2f%%)" % (len(lstImage), 100 * len(lstImage) / float(totalCount)))
+    logAndWriteFile(optFile, "Total %d images" % (totalCount))
 
-def validateImages():
+    logAndWriteFile(optFile, "*" * 100)
+    logAndWriteFile(optFile, "Spend :%d sec, avg:%.3f sec, total process:%d" % (totalSpend, totalSpend/float(totalCount), totalCount))
+
+    if printDetail:
+        for label, lstImage in dicResult.iteritems():
+            logAndWriteFile(optFile, " >>>>> Category %s" % label)
+            for img, score in lstImage:
+                logAndWriteFile(optFile, "%s:%f" % (img, score))
+
+def __validateImages(workspace, validate_folder, limit = sys.maxint):
     # Creates graph from saved GraphDef.
-    create_graph(MODEL_PATH)
+    from retrainingExample import *
+    create_graph(os.path.join(workspace, MODEL_NAME))
+    label_lines = load_labels(os.path.join(workspace, LABEL_NAME))
 
     imageList = os.listdir(validate_folder)
     imageList = sorted(imageList, reverse=True)
-
-    optFolderBase = os.path.join(WORKSPACE, CLASSIFY_RESULT_FOLDER)
-    checkFolder(optFolderBase)
-    optFolder = os.path.join(optFolderBase, os.path.split(validate_folder)[1])
-    checkFolder(optFolder)
-
-    f = open(LABEL_PATH, 'rb')
-    label_lines = f.readlines()
-
-    count = 0
     total = len(imageList)
+    if limit < total:
+        imageList = imageList[:limit]
+        total = len(imageList)
+
+    optFolder = __createFolders(workspace, label_lines, validate_folder)
+
     start = time.time()
-    lstXXX = []
-    lstNormal = []
-    for img in imageList:
+    dicResult = {}
+    for l in label_lines:
+        dicResult[l] = []
+
+    bar = progressbar.ProgressBar()
+    for img in bar(imageList):
         imagePath = os.path.join(validate_folder, img)
         try:
-            answer, score = analyzeIamge(imagePath, label_lines)
+            result = analyzeIamge(imagePath, label_lines)
         except:
             print "[Err] Invalid image path : %s" % imagePath
             continue
 
-        print "%s : %s" % (img , answer)
+        #print "%s : %s" % (img , answer)
 
-        if "xxx" in answer:
-            lstXXX.append((img, score))
-        else:
-            lstNormal.append((img, score))
+        answer, score = result[0]
+        a2, s2 = result[1]
+        dicResult[answer].append((img, score))
 
-        if __checkSaveTarget(answer):
-            copyfile(imagePath, os.path.join(optFolder, "%.3f_%s.jpg" % (score, img.split(".")[0])))
-
-        count += 1
-
-        printProgress(start, count, total)
+        copyfile(imagePath, os.path.join(optFolder, answer, "%d_%s%d_%s.jpg" % (score * 1000, a2, s2*1000, img.split(".")[0])))
+        #break
 
     totalSpend = time.time() - start
 
-    print "*" * 100
-    def __dump(cat, lst):
-        print " >>>>> Category %s" % cat
-        lst = sorted(lst, key = lambda x:x[1])
-        for img, score in lst:
-            print img, score
-    __dump("xxx", lstXXX)
-    __dump("normal", lstNormal)
+    __printResult(workspace, label_lines, dicResult, totalSpend, total)
 
-    print "[Result] Total : %d, xxx:%d, normal:%d" % (total, len(lstXXX), len(lstNormal))
+def __checkIfFolderValid(workspace, validate_folder):
+    if not workspace or not os.path.exists(workspace):
+        print "[Err]workspace:", args.workspace
+        return False
+    elif not validate_folder or not os.path.exists(validate_folder):
+        print "[Err]validate_folder:", args.validate_folder
+        return False
+    return True
 
+def batchValidateImages():
+    lstWorkspace = [
+        ('/home/brad_chang/deep_learning/trainedModel/tf/pg_hairstyle/v1/', "/data/dataset/training/pg1210_12199/"),
+        ('/home/brad_chang/deep_learning/trainedModel/tf/fashinon_recog/v1/', "/data/dataset/training/pg1210_12199/"),
+        ('/home/brad_chang/deep_learning/trainedModel/tf/pg_food/v1/', "/data/dataset/training/pg1210_12199/"),
+        ('/home/brad_chang/deep_learning/trainedModel/tf/pg_text/v1/', "/data/dataset/training/pg1210_12199/"),
+        ('/home/brad_chang/deep_learning/trainedModel/tf/xxx_recog_v2/v1/', "/data/dataset/training/pg1210_12199/"),
+        ]
+    for workspace, validate_folder in lstWorkspace:
+        if not __checkIfFolderValid(workspace, validate_folder):
+            return
 
-    print "*" * 100
-    print "Spend :%d sec, avg:%.3f sec, total process:%d" % (totalSpend, totalSpend/float(total), total)
+    for workspace, validate_folder in lstWorkspace:
+        launchValidateImageProcess(workspace, validate_folder)
+        pass
+
+def launchValidateImageProcess(workspace, validate_folder):
+    print "Launch new python process ..."
+    command = "python validateImages.py --new_process 1 --workspace %s --validate_folder %s" % (workspace, validate_folder)
+    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
+    process.wait()
+    print process.returncode
 
 if __name__ == '__main__':
-    validateImages()
+    #batchValidateImages()
+    parser = argparse.ArgumentParser(sys.argv)
+    parser.add_argument(
+        "--batch",
+        help="Batch Process"
+    )
+    parser.add_argument(
+        "--workspace",
+        help="The path of graph model and text"
+    )
+    parser.add_argument(
+        "--validate_folder",
+        help="Target validate folder"
+    )
+    parser.add_argument(
+        "--new_process",
+        help="Launch a new process to validate images"
+    )
+
+    args = parser.parse_args()
+    if args.new_process:
+        if __checkIfFolderValid(args.workspace, args.validate_folder):
+            __validateImages(args.workspace, args.validate_folder)
+    elif args.batch:
+        batchValidateImages()
+    else:
+        if __checkIfFolderValid(args.workspace, args.validate_folder):
+            __validateImages(args.workspace, args.validate_folder)

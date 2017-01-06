@@ -5,20 +5,27 @@ from retrainingExample import *
 from util import *
 from config import *
 
-TEST_FOLDER = "/home/brad_chang/deep_learning/dataset/test/fashion_test_1.5k"
+# Modify these two pathes !!
+TEST_FOLDER = "/home/brad_chang/deep_learning/dataset/test/xxx"
+MODEL_WORKSPACE = '/home/brad_chang/deep_learning/trainedModel/tf/xxx_recog_v2/v1'
+
 OPT_FALSE_FOLDER = os.path.join(OPT_FOLDER, OPT_TEST_FOLDER, os.path.split(TEST_FOLDER)[-1])
-OPT_FILE = OPT_FALSE_FOLDER + "_test_opt.txt"
+MODEl_PATH = os.path.join(MODEL_WORKSPACE, "output_graph.pb")
+LABEL_PATH = os.path.join(MODEL_WORKSPACE, "output_labels.txt")
 
-VERSION = 1
-WORKSPACE = '/home/brad_chang/deep_learning/trainedModel/tf/fashinon_recog/v%d' % VERSION
-MODEl_PATH = os.path.join(WORKSPACE, "output_graph.pb")
-LABEL_PATH = os.path.join(WORKSPACE, "output_labels.txt")
+label_lines = load_labels(LABEL_PATH)
 
-DIC_LABEL = {"pos":"fashion", "neg":"nofashion"}
+OPT_RESULT_FOLDER = os.path.join(MODEL_WORKSPACE, "result")
+OPT_FALSE_FOLDER = os.path.join(OPT_RESULT_FOLDER, "false_result")
+OPT_FILE = os.path.join(OPT_RESULT_FOLDER, "test_result.txt")
 
-def logAndWriteFile(f, msg):
-    if f : f.write(msg + "\n")
-    print msg
+DIC_LABEL = { \
+    "pos" : "xxx" ,\
+    "neg" : "normal" }
+
+DIC_LABEL_FOLDER_MAP = { \
+    "xxx nsfw 0 8" : DIC_LABEL.get("pos"), \
+    "pg nsfw 0 02" : DIC_LABEL.get("neg") }
 
 def createFalseLabelFolder(label):
     path = os.path.join(OPT_FALSE_FOLDER, label)
@@ -29,11 +36,10 @@ def testImages():
     create_graph(MODEl_PATH)
     checkFolder(OPT_FALSE_FOLDER)
 
-    label_lines = loadLables(LABEL_PATH)
-
     optLog = open(OPT_FILE, 'w')
 
-    logAndWriteFile(optLog, "Model:%s\n" % MODEl_PATH)
+    logAndWriteFile(optLog, "Model:%s" % MODEl_PATH)
+    logAndWriteFile(optLog, "Test:%s" % TEST_FOLDER)
 
     folders = os.listdir(TEST_FOLDER)
     allStart = time.time()
@@ -56,13 +62,13 @@ def testImages():
             if img.startswith("."):
                 continue
             imgPath = os.path.join(folderPath, img)
-            ans, score = analyzeIamge(imgPath, label_lines)
+            ans, score = analyzeIamge(imgPath, label_lines)[0]
             logAndWriteFile(optLog, "%s %s %.5f" % (img, ans, score))
-            if ans == folder:
+            if DIC_LABEL_FOLDER_MAP.get(ans) == folder:
                 t += 1
             else:
                 f += 1
-                copyfile(imgPath, os.path.join(falseLabelFolder, "%.3f_%s_%s.jpg" % (score, ans, img.split(".")[0])))
+                copyfile(imgPath, os.path.join(falseLabelFolder, "%.3f_%s_%s.jpg" % (score, ans, img.split(".jpg")[-2])))
 
             count += 1
             if printProgress(start, count, total):
@@ -96,8 +102,45 @@ def measureModelPerformance(optLog, dicResult, dicLabelSet = DIC_LABEL):
     logAndWriteFile(optLog, "Accuracy :\t%.2f%%" % ( (TP + TN) * 100 / float(TP + FP + TN + FN) ))
     logAndWriteFile(optLog, "Recall :\t%.2f%%" % ( TP * 100 / float(TP + FN) ))
 
+def test_measureModelPerformance():
+    optLog = None#open("", 'w')
+    dicLabelSet = DIC_LABEL
+    dicResult = {"xxx":(13, 20), "normal":(123, 1)}
+    measureModelPerformance(optLog, dicResult, dicLabelSet)
+
+def test_nsfw_measureModelPerformance():
+    optLog = None#open("", 'w')
+    #dicLabelSet = DIC_LABEL
+    posFolder = "/home/brad_chang/deep_learning/dataset/test/xxx/xxx"
+    negFolder = "/home/brad_chang/deep_learning/dataset/test/xxx/normal"
+
+    def __getTFResult(path, rev = False, creteria = 0.9):
+        lst = os.listdir(path)
+        t, f = 0, 0
+        for img in lst:
+            #print img.split("_")
+            score, name = img.split("_")
+            if float(score) >= creteria:
+                t += 1
+            else:
+                f += 1
+        return (f, t) if rev else (t, f)
+
+    for cri in [0.7, 0.75, 0.8, 0.85, 0.95]:
+        print "Criteria : ", cri
+        dicResult = {"xxx" : __getTFResult(posFolder, creteria = cri), "normal" : __getTFResult(negFolder, rev = True, creteria = cri)}
+        measureModelPerformance(optLog, dicResult)
+        print "\n\n"
+
+def nsfwFilter():
+    pass
+
 if __name__ == '__main__':
-    testImages()
-    #optLog = None
-    #dicResult = {"fashion":(72, 28), "nofashion":(1142, 258)}
-    #measureModelPerformance(None, dicResult)
+    if not DIC_LABEL_FOLDER_MAP.has_key(label_lines[0]):
+        print "Lable Mapping Error !!!"
+        print "Need to define ", label_lines
+        print "Current defined labels:", DIC_LABEL_FOLDER_MAP
+    else:
+        testImages()
+
+    #test_nsfw_measureModelPerformance()
