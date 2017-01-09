@@ -7,7 +7,7 @@ from config import *
 
 # Modify these two pathes !!
 TEST_FOLDER = "/home/brad_chang/deep_learning/dataset/test/xxx"
-MODEL_WORKSPACE = '/home/brad_chang/deep_learning/trainedModel/tf/xxx_recog_v2/v1'
+MODEL_WORKSPACE = '/home/brad_chang/deep_learning/trainedModel/tf/xxx_recog_v2/v2'
 
 OPT_FALSE_FOLDER = os.path.join(OPT_FOLDER, OPT_TEST_FOLDER, os.path.split(TEST_FOLDER)[-1])
 MODEl_PATH = os.path.join(MODEL_WORKSPACE, "output_graph.pb")

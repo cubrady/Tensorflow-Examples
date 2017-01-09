@@ -12,15 +12,17 @@ LABEL_NAME = 'output_labels.txt'
 
 def __createFolders(workspace, label_lines, validate_folder):
     fset = validate_folder.split("/")
-    optFolderBase = os.path.join(workspace, fset[-1] if fset[-1] else fset[-2])
+    optFolder = fset[-1] if fset[-1] else fset[-2]
+    optFolderBase = os.path.join(workspace, optFolder)
     checkFolder(optFolderBase)
     for l in label_lines:
-        optFolder = os.path.join(optFolderBase, l)
-        checkFolder(optFolder)
-    return optFolderBase
+        folder = os.path.join(optFolderBase, l)
+        checkFolder(folder)
+    return optFolderBase, optFolder
 
-def __printResult(workspace, label_lines, dicResult, totalSpend, totalCount, printDetail = False):
-    optFile = open(os.path.join(workspace, "result.txt"), "w")
+def __printResult(workspace, label_lines, dicResult, totalSpend, totalCount, optFolderName, printDetail = False):
+    optFilePath = os.path.join(workspace, "result_%s.txt" % optFolderName)
+    optFile = open(optFilePath, "w")
     logAndWriteFile(optFile, "*" * 100)
 
     maxLabelLen = 0
@@ -35,6 +37,7 @@ def __printResult(workspace, label_lines, dicResult, totalSpend, totalCount, pri
 
     logAndWriteFile(optFile, "*" * 100)
     logAndWriteFile(optFile, "Spend :%d sec, avg:%.3f sec, total process:%d" % (totalSpend, totalSpend/float(totalCount), totalCount))
+    print "Result is dumpped to %s" % optFilePath
 
     if printDetail:
         for label, lstImage in dicResult.iteritems():
@@ -44,7 +47,7 @@ def __printResult(workspace, label_lines, dicResult, totalSpend, totalCount, pri
 
 def __validateImages(workspace, validate_folder, limit = sys.maxint):
     # Creates graph from saved GraphDef.
-    from retrainingExample import *
+    from retrainingExample import create_graph, load_labels, analyzeIamge
     create_graph(os.path.join(workspace, MODEL_NAME))
     label_lines = load_labels(os.path.join(workspace, LABEL_NAME))
 
@@ -55,23 +58,19 @@ def __validateImages(workspace, validate_folder, limit = sys.maxint):
         imageList = imageList[:limit]
         total = len(imageList)
 
-    optFolder = __createFolders(workspace, label_lines, validate_folder)
+    optFolder, optFolderName = __createFolders(workspace, label_lines, validate_folder)
 
-    start = time.time()
     dicResult = {}
     for l in label_lines:
         dicResult[l] = []
 
     bar = progressbar.ProgressBar()
+
+    start = time.time()
     for img in bar(imageList):
         imagePath = os.path.join(validate_folder, img)
-        try:
-            result = analyzeIamge(imagePath, label_lines)
-        except:
-            print "[Err] Invalid image path : %s" % imagePath
-            continue
-
-        #print "%s : %s" % (img , answer)
+        result = analyzeIamge(imagePath, label_lines)
+        #print result
 
         answer, score = result[0]
         a2, s2 = result[1]
@@ -82,7 +81,7 @@ def __validateImages(workspace, validate_folder, limit = sys.maxint):
 
     totalSpend = time.time() - start
 
-    __printResult(workspace, label_lines, dicResult, totalSpend, total)
+    __printResult(workspace, label_lines, dicResult, totalSpend, total, optFolderName)
 
 def __checkIfFolderValid(workspace, validate_folder):
     if not workspace or not os.path.exists(workspace):
@@ -95,11 +94,11 @@ def __checkIfFolderValid(workspace, validate_folder):
 
 def batchValidateImages():
     lstWorkspace = [
-        ('/home/brad_chang/deep_learning/trainedModel/tf/pg_hairstyle/v1/', "/data/dataset/training/pg1210_12199/"),
-        ('/home/brad_chang/deep_learning/trainedModel/tf/fashinon_recog/v1/', "/data/dataset/training/pg1210_12199/"),
-        ('/home/brad_chang/deep_learning/trainedModel/tf/pg_food/v1/', "/data/dataset/training/pg1210_12199/"),
-        ('/home/brad_chang/deep_learning/trainedModel/tf/pg_text/v1/', "/data/dataset/training/pg1210_12199/"),
-        ('/home/brad_chang/deep_learning/trainedModel/tf/xxx_recog_v2/v1/', "/data/dataset/training/pg1210_12199/"),
+        # ('/home/brad_chang/deep_learning/trainedModel/tf/pg_hairstyle/v1/', "/data/dataset/training/pg1210_12199/"),
+        # ('/home/brad_chang/deep_learning/trainedModel/tf/fashinon_recog/v1/', "/data/dataset/training/pg1210_12199/"),
+        # ('/home/brad_chang/deep_learning/trainedModel/tf/pg_food/v1/', "/data/dataset/training/pg1210_12199/"),
+        # ('/home/brad_chang/deep_learning/trainedModel/tf/pg_text/v1/', "/data/dataset/training/pg1210_12199/"),
+        ('/home/brad_chang/deep_learning/trainedModel/tf/xxx_recog_v2/v2/', "/data/dataset/training/pg1210_12199/"),
         ]
     for workspace, validate_folder in lstWorkspace:
         if not __checkIfFolderValid(workspace, validate_folder):
@@ -111,10 +110,12 @@ def batchValidateImages():
 
 def launchValidateImageProcess(workspace, validate_folder):
     print "Launch new python process ..."
+    print "workspace:", workspace
+    print "validate_folder:", validate_folder
     command = "python validateImages.py --new_process 1 --workspace %s --validate_folder %s" % (workspace, validate_folder)
-    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
-    process.wait()
-    print process.returncode
+    #process = subprocess.Popen(command)#, shell=True, stdout=subprocess.PIPE)
+    subprocess.call(command, shell=True)
+    #process.wait()
 
 if __name__ == '__main__':
     #batchValidateImages()
