@@ -45,6 +45,16 @@ def __printResult(workspace, label_lines, dicResult, totalSpend, totalCount, opt
             for img, score in lstImage:
                 logAndWriteFile(optFile, "%s:%f" % (img, score))
 
+def __validateImage(workspace, imagePath, testCount = 1):
+    from retrainingExample import create_graph, load_labels, analyzeIamge
+    create_graph(os.path.join(workspace, MODEL_NAME))
+    label_lines = load_labels(os.path.join(workspace, LABEL_NAME))
+    t = time.time()
+    for i in xrange(0, testCount):
+        result = analyzeIamge(imagePath, label_lines)
+        print result
+    print "analyzeIamge spend:%f sec" % ((time.time() - t) / float(testCount))
+
 def __validateImages(workspace, validate_folder, limit = sys.maxint):
     # Creates graph from saved GraphDef.
     from retrainingExample import create_graph, load_labels, analyzeIamge
@@ -98,7 +108,7 @@ def batchValidateImages():
         # ('/home/brad_chang/deep_learning/trainedModel/tf/fashinon_recog/v1/', "/data/dataset/training/pg1210_12199/"),
         # ('/home/brad_chang/deep_learning/trainedModel/tf/pg_food/v1/', "/data/dataset/training/pg1210_12199/"),
         # ('/home/brad_chang/deep_learning/trainedModel/tf/pg_text/v1/', "/data/dataset/training/pg1210_12199/"),
-        ('/home/brad_chang/deep_learning/trainedModel/tf/xxx_recog_v2/v2/', "/data/dataset/training/pg1210_12199/"),
+        ('/home/brad_chang/deep_learning/trainedModel/tf/xxx_recog_v2/v1/', "/data/dataset/training/pg1210_12199/"),
         ]
     for workspace, validate_folder in lstWorkspace:
         if not __checkIfFolderValid(workspace, validate_folder):
@@ -129,6 +139,10 @@ if __name__ == '__main__':
         help="The path of graph model and text"
     )
     parser.add_argument(
+        "--validate_file",
+        help="Target validate image file"
+    )
+    parser.add_argument(
         "--validate_folder",
         help="Target validate folder"
     )
@@ -138,7 +152,10 @@ if __name__ == '__main__':
     )
 
     args = parser.parse_args()
-    if args.new_process:
+    if args.validate_file:
+        if __checkIfFolderValid(args.workspace, args.workspace):
+            __validateImage(args.workspace, args.validate_file)
+    elif args.new_process:
         if __checkIfFolderValid(args.workspace, args.validate_folder):
             __validateImages(args.workspace, args.validate_folder)
     elif args.batch:
