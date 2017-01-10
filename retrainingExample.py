@@ -41,6 +41,9 @@ For testing through python, change and run this code.
 import numpy as np
 import tensorflow as tf
 
+TF_SESSION = None
+SOFTMAX_TENSOR = None
+
 def create_graph(graphModelPath):
     """Creates a graph from saved GraphDef file and returns a saver."""
     # Creates graph from saved graph_def.pb.
@@ -49,6 +52,11 @@ def create_graph(graphModelPath):
         graph_def.ParseFromString(f.read())
         _ = tf.import_graph_def(graph_def, name='')
 
+    global TF_SESSION
+    global SOFTMAX_TENSOR
+    TF_SESSION = tf.Session()
+    SOFTMAX_TENSOR = TF_SESSION.graph.get_tensor_by_name('final_result:0')
+
 def load_labels(path):
     label_lines = []
     for l in open(path, "r"):
@@ -56,33 +64,25 @@ def load_labels(path):
     return label_lines
 
 def analyzeIamge(image_path, label_lines):
-    answer = None
-    score = 0
-
     if not tf.gfile.Exists(image_path):
         tf.logging.fatal('File does not exist %s', image_path)
         return None
 
     image_data = tf.gfile.FastGFile(image_path, 'rb').read()
 
-    with tf.Session() as sess:
+    predictions = TF_SESSION.run(SOFTMAX_TENSOR, {'DecodeJpeg/contents:0': image_data})
+    predictions = np.squeeze(predictions)
 
-        softmax_tensor = sess.graph.get_tensor_by_name('final_result:0')
-        predictions = sess.run(softmax_tensor, {'DecodeJpeg/contents:0': image_data})
-        predictions = np.squeeze(predictions)
+    top_k = predictions.argsort()[-5:][::-1]  # Getting top 5 predictions
+    labels = label_lines#[str(w).replace("\n", "") for w in label_lines]
+    ret = []
+    for node_id in top_k:
+        human_string = labels[node_id]
+        score = predictions[node_id]
+        #print('%s (score = %.5f)' % (human_string, score))
+        ret.append((human_string, score))
 
-        top_k = predictions.argsort()[-5:][::-1]  # Getting top 5 predictions
-        labels = label_lines#[str(w).replace("\n", "") for w in label_lines]
-        ret = []
-        for node_id in top_k:
-            human_string = labels[node_id]
-            score = predictions[node_id]
-            #print('%s (score = %.5f)' % (human_string, score))
-            ret.append((human_string, score))
-
-        #answer = labels[top_k[0]]
-        #score = predictions[top_k[0]]
-        return ret#answer, score, labels[top_k[1]], predictions[top_k[1]]
+    return ret#answer, score, labels[top_k[1]], predictions[top_k[1]]
 
 if __name__ == '__main__':
     #validateImages()
