@@ -30,3 +30,23 @@ def formatSec(seconds):
 def logAndWriteFile(f, msg):
     if f : f.write(msg + "\n")
     print msg
+
+PIL_IMG_FORMAT_JPEG = "JPEG"
+PIL_IMG_FORMAT_PNG = "PNG"
+def ensureImageFormatValid(path, validImageSet = [PIL_IMG_FORMAT_JPEG, PIL_IMG_FORMAT_PNG], delInvaidFile = False):
+    # /data/dataset/training/flower_photos/
+    from PIL import Image
+    for dirPath, dirNames, fileNames in os.walk(path):
+        print "Scanning %s ... " % dirPath
+        for f in fileNames:
+            img_path = os.path.join(dirPath, f)
+            try:
+                im = Image.open(img_path)
+                if im.format not in validImageSet:
+                    print img_path
+            except Exception as err:
+                print err
+                print "ERROR : %s" % img_path
+                if delInvaidFile:
+                    os.remove(img_path)
+                    print "Remove %s OK" % img_path

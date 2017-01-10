@@ -71,7 +71,13 @@ def analyzeIamge(image_path, label_lines):
 
     image_data = tf.gfile.FastGFile(image_path, 'rb').read()
 
-    predictions = TF_SESSION.run(SOFTMAX_TENSOR, {'DecodeJpeg/contents:0': image_data})
+    try:
+        predictions = TF_SESSION.run(SOFTMAX_TENSOR, {'DecodeJpeg/contents:0': image_data})
+    except Exception as err:
+        print "Err: %s" % image_path
+        print err
+        return ret
+
     predictions = np.squeeze(predictions)
 
     top_k = predictions.argsort()[-5:][::-1]  # Getting top 5 predictions

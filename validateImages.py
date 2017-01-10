@@ -55,7 +55,7 @@ def __validateImage(workspace, imagePath, testCount = 1):
         print result
     print "analyzeIamge spend:%f sec" % ((time.time() - t) / float(testCount))
 
-def __validateImages(workspace, validate_folder, limit = sys.maxint):
+def __validateImages(workspace, validate_folder, copy = 1, limit = sys.maxint):
     # Creates graph from saved GraphDef.
     from retrainingExample import create_graph, load_labels, analyzeIamge
     create_graph(os.path.join(workspace, MODEL_NAME))
@@ -80,13 +80,13 @@ def __validateImages(workspace, validate_folder, limit = sys.maxint):
     for img in bar(imageList):
         imagePath = os.path.join(validate_folder, img)
         result = analyzeIamge(imagePath, label_lines)
-        #print result
+        #print img, result
+        if result:
+            answer, score = result[0]
+            a2, s2 = result[1]
+            dicResult[answer].append((img, score))
 
-        answer, score = result[0]
-        a2, s2 = result[1]
-        dicResult[answer].append((img, score))
-
-        copyfile(imagePath, os.path.join(optFolder, answer, "%d_%s%d_%s.jpg" % (score * 1000, a2, s2*1000, img.split(".")[0])))
+        if copy: copyfile(imagePath, os.path.join(optFolder, answer, "%d_%s%d_%s.jpg" % (score * 1000, a2, s2*1000, img.split(".")[0])))
         #break
 
     totalSpend = time.time() - start
@@ -108,7 +108,7 @@ def batchValidateImages():
         # ('/home/brad_chang/deep_learning/trainedModel/tf/fashinon_recog/v1/', "/data/dataset/training/pg1210_12199/"),
         # ('/home/brad_chang/deep_learning/trainedModel/tf/pg_food/v1/', "/data/dataset/training/pg1210_12199/"),
         # ('/home/brad_chang/deep_learning/trainedModel/tf/pg_text/v1/', "/data/dataset/training/pg1210_12199/"),
-        ('/home/brad_chang/deep_learning/trainedModel/tf/xxx_recog_v2/v1/', "/data/dataset/training/pg1210_12199/"),
+        ('/home/brad_chang/deep_learning/trainedModel/tf/xxx_recog_v2/v2/', "/data/dataset/training/pg1210_12199/"),
         ]
     for workspace, validate_folder in lstWorkspace:
         if not __checkIfFolderValid(workspace, validate_folder):
@@ -150,6 +150,10 @@ if __name__ == '__main__':
         "--new_process",
         help="Launch a new process to validate images"
     )
+    parser.add_argument(
+        "--copyfile",
+        help="Copy analyzed image to the folder with label name"
+    )
 
     args = parser.parse_args()
     if args.validate_file:
@@ -157,9 +161,9 @@ if __name__ == '__main__':
             __validateImage(args.workspace, args.validate_file)
     elif args.new_process:
         if __checkIfFolderValid(args.workspace, args.validate_folder):
-            __validateImages(args.workspace, args.validate_folder)
+            __validateImages(args.workspace, args.validate_folder, copy = args.copyfile)
     elif args.batch:
         batchValidateImages()
     else:
         if __checkIfFolderValid(args.workspace, args.validate_folder):
-            __validateImages(args.workspace, args.validate_folder)
+            __validateImages(args.workspace, args.validate_folder, copy = args.copyfile)
