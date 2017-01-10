@@ -64,9 +64,10 @@ def load_labels(path):
     return label_lines
 
 def analyzeIamge(image_path, label_lines):
+    ret = []
     if not tf.gfile.Exists(image_path):
         tf.logging.fatal('File does not exist %s', image_path)
-        return None
+        return ret
 
     image_data = tf.gfile.FastGFile(image_path, 'rb').read()
 
@@ -75,7 +76,6 @@ def analyzeIamge(image_path, label_lines):
 
     top_k = predictions.argsort()[-5:][::-1]  # Getting top 5 predictions
     labels = label_lines#[str(w).replace("\n", "") for w in label_lines]
-    ret = []
     for node_id in top_k:
         human_string = labels[node_id]
         score = predictions[node_id]
