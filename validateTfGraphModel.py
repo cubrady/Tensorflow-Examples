@@ -7,9 +7,6 @@ import subprocess
 from shutil import copyfile
 from util import *
 
-MODEL_NAME = 'output_graph.pb'
-LABEL_NAME = 'output_labels.txt'
-
 def __createFolders(workspace, label_lines, validate_folder):
     fset = validate_folder.split("/")
     optFolder = fset[-1] if fset[-1] else fset[-2]
@@ -25,12 +22,7 @@ def __printResult(workspace, label_lines, dicResult, totalSpend, totalCount, opt
     optFile = open(optFilePath, "w")
     logAndWriteFile(optFile, "*" * 100)
 
-    maxLabelLen = 0
-    for l in label_lines:
-        if len(l) > maxLabelLen:
-            maxLabelLen = len(l)
-
-    labelP = "%%%ds" % maxLabelLen
+    labelP = getLabelDisplayString(label_lines)
     for label, lstImage in dicResult.iteritems():
         logAndWriteFile(optFile, "Label " + labelP % label + " : %d ( %.2f%%)" % (len(lstImage), 100 * len(lstImage) / float(totalCount)))
     logAndWriteFile(optFile, "Total %d images" % (totalCount))

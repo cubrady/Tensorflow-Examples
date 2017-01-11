@@ -27,13 +27,13 @@ def formatSec(seconds):
     h, m = divmod(m, 60)
     return "%d:%02d:%02d" % (h, m, s)
 
-def logAndWriteFile(f, msg):
+def logAndWriteFile(f, msg, printMsg = True):
     if f : f.write(msg + "\n")
-    print msg
+    if printMsg : print msg
 
 PIL_IMG_FORMAT_JPEG = "JPEG"
 PIL_IMG_FORMAT_PNG = "PNG"
-def ensureImageFormatValid(path, validImageSet = [PIL_IMG_FORMAT_JPEG, PIL_IMG_FORMAT_PNG], delInvaidFile = False):
+def ensureImageFormatValid(path, validImageSet = [PIL_IMG_FORMAT_JPEG, PIL_IMG_FORMAT_PNG], delInvaidImageFile = False):
     # /data/dataset/training/flower_photos/
     from PIL import Image
     for dirPath, dirNames, fileNames in os.walk(path):
@@ -47,6 +47,16 @@ def ensureImageFormatValid(path, validImageSet = [PIL_IMG_FORMAT_JPEG, PIL_IMG_F
             except Exception as err:
                 print err
                 print "ERROR : %s" % img_path
-                if delInvaidFile:
+                if delInvaidImageFile:
                     os.remove(img_path)
                     print "Remove %s OK" % img_path
+
+    print "Done !!"
+
+def getLabelDisplayString(label_lines):
+    maxLabelLen = 0
+    for l in label_lines:
+        if len(l) > maxLabelLen:
+            maxLabelLen = len(l)
+
+    return "%%%ds" % maxLabelLen
