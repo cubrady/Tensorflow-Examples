@@ -11,17 +11,17 @@ from config import *
 # Path and test folder, analyzed image label predefinitions
 ##############################################################
 TEST_FOLDER = "/home/brad_chang/deep_learning/dataset/test/label_set/"
-MODEL_WORKSPACE = '/home/brad_chang/deep_learning/trainedModel/tf/pg_label_set/v3/'
+MODEL_WORKSPACE = '/home/brad_chang/deep_learning/trainedModel/tf/pg_label_set/v1/'
 
 DIC_LABEL_FOLDER_MAP = {
-    # label : folder
-    'fashion' : 'fashion',
+    # folder    : label
+    'fashion'   : 'fashion',
     'hairstyle' : 'hairstyle',
-    'food': "food",
-    #'unknown' : "",
-    'travel' : "travel",
-    'text' : "text",
-    'xxxnsfw80' : "xxx"}
+    'food'      : "food",
+    'unknown'   : "unknown",
+    'travel'    : "travel",
+    'text'      : "text",
+    'xxx'       : "xxxnsfw80"}
 
 ##############################################################
 
@@ -48,18 +48,24 @@ def testImages(label_lines, scoreCriteria = SCORE_CRITERIA):
 
     optLog = open(OPT_FILE, 'w')
 
+    dicEvaluationResult = {}
+    for l in label_lines:
+        dicEvaluationResult[l] = [0, 0, 0, 0] #TP, FP, TN, FN
+
     logAndWriteFile(optLog, "Model:%s" % MODEl_PATH)
     logAndWriteFile(optLog, "Test:%s" % TEST_FOLDER)
 
     folders = os.listdir(TEST_FOLDER)
     allStart = time.time()
-    dicResult = {}
+    dicAnalyzedResult = {}
     totlImgCount = 0
     for folder in folders:
         folderPath = os.path.join(TEST_FOLDER, folder)
         if not os.path.isdir(folderPath):
             print "[Warning] %s is not a valid folder" % folderPath
             continue
+
+        dicAnalyzedResult[DIC_LABEL_FOLDER_MAP.get(folder)] = []
 
         falseLabelFolder = createResultOptFolder(OPT_FALSE_FOLDER, folder)
         imageList = os.listdir(folderPath)
@@ -74,20 +80,26 @@ def testImages(label_lines, scoreCriteria = SCORE_CRITERIA):
         bar = progressbar.ProgressBar()
         for img in bar(imageList):
             imgPath = os.path.join(folderPath, img)
-            ans, score = analyzeIamge(imgPath, label_lines)[0] # Get top
-            logAndWriteFile(optLog, "%s %s %.5f" % (imgPath, ans, score), printMsg = False)
+            response, score = analyzeIamge(imgPath, label_lines)[0] # Get top
+            logAndWriteFile(optLog, "%s %s %.5f" % (imgPath, response, score), printMsg = False)
             totlImgCount += 1
-            if score > scoreCriteria:
-                if ans == DIC_LABEL_FOLDER_MAP.get(folder):
-                    TP += 1
-                else:
-                    TN += 1
-            else:
-                if ans == DIC_LABEL_FOLDER_MAP.get(folder):
-                    FP += 1
-                else:
-                    FN += 1
-                copyfile(imgPath, os.path.join(falseLabelFolder, "%.3f_%s_%s.jpg" % (score, ans, img.split(".jpg")[-2])))
+
+            lstResult = dicAnalyzedResult.get(DIC_LABEL_FOLDER_MAP.get(folder))
+            lstResult.append((imgPath, response, score))
+
+            # if response == DIC_LABEL_FOLDER_MAP.get(folder):
+            #     #
+            # if score > scoreCriteria:
+            #     if response == DIC_LABEL_FOLDER_MAP.get(folder):
+            #         TP += 1
+            #     else:
+            #         FP += 1
+            # else:
+            #     if response == DIC_LABEL_FOLDER_MAP.get(folder):
+            #         TN += 1
+            #     else:
+            #         FN += 1
+            #     copyfile(imgPath, os.path.join(falseLabelFolder, "%.3f_%s_%s.jpg" % (score, ans, img.split(".jpg")[-2])))
             # if DIC_LABEL_FOLDER_MAP.get(ans) == folder:
             #     t += 1
             # else:
@@ -96,15 +108,33 @@ def testImages(label_lines, scoreCriteria = SCORE_CRITERIA):
 
             count += 1
 
-        dicResult[folder] = (TP, FP, TN, FN)
-
-        # logAndWriteFile(optLog, "*" * 25 + " Result " + "*" * 25)
-        # logAndWriteFile(optLog, "%s (count:%d) - T:%d(%.2f%%) F:%d(%.2f%%)" % (folder, total, t, t/float(total)*100, f, f/float(total)*100))
-        # logAndWriteFile(optLog, "*" * 60)
-
     logAndWriteFile(optLog, "All process done, spend %s, %d images analyzed" % (formatSec(time.time() - allStart), totlImgCount))
 
-    measureModelPerformance(optLog, dicResult)
+    calculateEvaluation(dicEvaluationResult, dicAnalyzedResult)
+    measureModelPerformance(optLog, dicEvaluationResult)
+
+def calculateEvaluation(dicEvaluationResult, dicAnalyzedResult):
+    print dicAnalyzedResult.keys()
+    print dicEvaluationResult
+    total = 0
+    for ans, lstResult in dicAnalyzedResult.iteritems():
+        lstEvaluation = dicEvaluationResult[ans] #TP, FP, TN, FN
+        total += len(lstResult)
+        for (imgPath, response, score) in lstResult:
+            if response == ans:
+                # Correct answer, TP
+                lstEvaluation[0] += 1
+            else:
+                # Wrong answer, FN for ans
+                lstEvaluation[3] += 1
+                # FP for the analyzed label
+                dicEvaluationResult[response][1] += 1
+                #copyfile(imgPath, os.path.join(falseLabelFolder, "%.3f_%s_%s.jpg" % (score, ans, img.split(".jpg")[-2])))
+
+    # Caculate TN
+    for ans, lstEval in dicEvaluationResult.iteritems():
+        lstEval[2] = total - lstEval[0] - lstEval[1] - lstEval[3]
+        print "%s : %s" % (ans, lstEval)
 
 def measureModelPerformance(optLog, dicResult, dicLabelSet = DIC_LABEL_FOLDER_MAP):
     logAndWriteFile(optLog, "\n" + "#" * 15 + " Model Performance Summary " + "#" * 15)
@@ -122,17 +152,17 @@ def measureModelPerformance(optLog, dicResult, dicLabelSet = DIC_LABEL_FOLDER_MA
 
     def __printResult(TP, FP, TN, FN):
         precesionSet, accuracySet, recallSet = __calResult(TP, FP, TN, FN)
-        logAndWriteFile(optLog, "Precision :\t%.2f%% (%d / %d)" % (precesionSet[0], precesionSet[1], precesionSet[2]) )
-        logAndWriteFile(optLog, "Accuracy :\t%.2f%% (%d / %d)" % (accuracySet[0], accuracySet[1], accuracySet[2]))
-        logAndWriteFile(optLog, "Recall :\t%.2f%% (%d / %d)" % ( recallSet[0], recallSet[1], recallSet[2] ))
+        logAndWriteFile(optLog, "Precision\t: %.2f%% (%d / %d)" % (precesionSet[0], precesionSet[1], precesionSet[2]) )
+        logAndWriteFile(optLog, "Accuracy\t: %.2f%% (%d / %d)" % (accuracySet[0], accuracySet[1], accuracySet[2]))
+        logAndWriteFile(optLog, "Recall\t: %.2f%% (%d / %d)" % ( recallSet[0], recallSet[1], recallSet[2] ))
 
     allTP, allFP, allTN, allFN = 0, 0, 0, 0
     for label, result in dicResult.iteritems():
         TP, FP, TN, FN = result
         logAndWriteFile(optLog, "-" * 21 + " %s " % label + "-" * 21)
         logAndWriteFile(optLog, "\tTotal\tTrue\tFalse")
-        logAndWriteFile(optLog, "Pos\t%d\t %d\t %d" % (TP + FP, TP, FP))
-        logAndWriteFile(optLog, "Neg\t%d\t %d\t %d" % (TN + FN, TN, FN))
+        logAndWriteFile(optLog, "Pos\t%4d\t%4d\t %d" % (TP + FP, TP, FP))
+        logAndWriteFile(optLog, "Neg\t%4d\t%4d\t %d" % (TN + FN, TN, FN))
         __printResult(TP, FP, TN, FN)
 
         allTP += TP
@@ -148,7 +178,7 @@ def validateTfModel():
     label_lines = load_labels(LABEL_PATH)
 
     testFolders = os.listdir(TEST_FOLDER)
-    valtestFolders = DIC_LABEL_FOLDER_MAP.values()
+    valtestFolders = DIC_LABEL_FOLDER_MAP.keys()
     canGoTest = True
     for folder in valtestFolders:
         if not folder or folder not in testFolders:
