@@ -46,12 +46,9 @@ class RedisQueue(object):
 
 REDIS_QUEUE = RedisQueue("test", namespace='test', host='localhost', port=6379, db=0)
 
-def testPutTask():
-    REDIS_QUEUE.put("{'id':111, 'img':'http://aaa.aaa.aaa/aaa.jpg'}")
-
 def testResdisServer():
     if REDIS_QUEUE.empty():
-        testPutTask()
+        REDIS_QUEUE.put("{'id':111, 'img':'http://aaa.aaa.aaa/aaa.jpg'}")
 
     print "qsize:", REDIS_QUEUE.qsize()
     #print "empty:", REDIS_QUEUE.empty()
@@ -63,4 +60,5 @@ def getTaskFromQueue():
     ret = REDIS_QUEUE.get(True)
     return ast.literal_eval(ret)
 
-testResdisServer()
+if __name__ == '__main__':
+    testResdisServer()
